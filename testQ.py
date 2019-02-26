@@ -5,15 +5,15 @@ from collections import deque
 from tilecoding import TileCoder
 
 env = gym.make("CartPole-v1")
-alpha = 0.5        # learn rate
-gamma = 0.99       # discount fact
-epsilon = 0.2      # explore rate
+alpha = 0.4        # learn rate
+gamma = 0.5       # discount fact
+epsilon = 0.1      # explore rate
 low = env.observation_space.low
 high = env.observation_space.high
 
-tiles_per_dim = [0, 0, 10, 13]
+tiles_per_dim = [0, 0, 10, 10]
 lims = [(low[0], high[0]), (low[1], high[1]), (low[2], high[2]), (low[3], high[3])]
-tilings = 7
+tilings = 5
 
 T = TileCoder(tiles_per_dim, lims, tilings)
 
@@ -22,19 +22,23 @@ print(T.n_tiles)
 
 Q = dict()
 
+# continuous to discrete, create key if not exist
+def disc(state):
+  disc_state = T[state][0]
+  if disc_state not in Q:
+    Q[disc_state] = np.zeros(2)
+  return disc_state
+
 def get_action(state):
-  if T[state][0] not in Q:
-    Q[T[state][0]] = np.zeros(2)
-  return env.action_space.sample() if np.random.random() <= epsilon else np.argmax(Q[T[state][0]])
+  state = disc(state)
+  return env.action_space.sample() if np.random.uniform(0,1) <= epsilon else np.argmax(Q[state])
 
 def update_q(state, next_state, action, reward):
-  if T[state][0] not in Q:
-    Q[T[state][0]] = np.zeros(2)
-  if T[next_state][0] not in Q:
-    Q[T[next_state][0]] = np.zeros(2)
-  Q[T[state][0]][action] += alpha * (reward + gamma * np.max(Q[T[next_state][0]]) - Q[T[state][0]][action])
+  state = disc(state)
+  next_state = disc(next_state)
+  Q[state][action] = (1 - alpha) * Q[state][action] + alpha * (reward + gamma * np.max(Q[next_state]))
 
-n_episodes = 10000
+n_episodes = 3000
 best_score = 0
 scores = deque(maxlen=100)
 
@@ -42,7 +46,7 @@ for e in range(n_episodes):
   state = env.reset()
   score = 0
   done = False
-  alpha = max(0.01, alpha - alpha * 0.0004)
+  #alpha = max(0.01, alpha - alpha * 0.0004)
   epsilon = max(0.01, epsilon - epsilon * 0.0001)
 
   while not done:
